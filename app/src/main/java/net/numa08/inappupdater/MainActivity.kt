@@ -7,8 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -88,6 +87,8 @@ fun MainScreen() {
             }) {
                 Text(text = "Update Immediate")
             }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = "error: ${inAppUpdateManager.errorMessage ?: "No error"}")
         }
     }
 }
@@ -104,14 +105,25 @@ class InAppUpdateManager(
     private val appUpdateManager: AppUpdateManager
 ) {
 
+    var errorMessage: String? by mutableStateOf(null)
+
     suspend fun requestUpdate(
         @AppUpdateType updateType: Int,
         activity: Activity
     ) {
-        val appUpdateInfo = appUpdateManager
-            .appUpdateInfo
-            .asFlow()
-            .first()
+        errorMessage = null
+        val appUpdateInfo = runCatching {
+            appUpdateManager
+                .appUpdateInfo
+                .asFlow()
+                .first()
+        }.fold(
+            onSuccess = { it },
+            onFailure = {
+                errorMessage = it.localizedMessage
+                null
+            }
+        ) ?: return
         if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE) {
             appUpdateManager
                 .startUpdateFlow(
@@ -139,5 +151,5 @@ fun <T> Task<T>.asFlow(): Flow<T> = callbackFlow {
     addOnSuccessListener(successListener)
     addOnFailureListener(onFailureListener)
     addOnCompleteListener(onCompleteListener)
-    awaitClose {  }
+    awaitClose { }
 }
